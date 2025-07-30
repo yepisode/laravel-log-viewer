@@ -40,10 +40,54 @@
 
         .search-panel {
             background: white;
-            padding: 25px;
             border-radius: 10px;
             margin-bottom: 30px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        
+        .search-panel-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 25px;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .search-panel-header:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        }
+        
+        .search-panel-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .accordion-icon {
+            transition: transform 0.3s ease;
+            font-size: 1.2rem;
+        }
+        
+        .accordion-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .search-panel-content {
+            padding: 25px;
+            transition: all 0.3s ease;
+            max-height: 1000px;
+            overflow: hidden;
+        }
+        
+        .search-panel-content.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
         }
 
         .search-form {
@@ -410,72 +454,79 @@
         </div>
 
         <div class="search-panel">
-            <div class="path-setting" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="log_directory">로그 디렉토리 경로</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="log_directory" name="log_directory" 
-                               placeholder="/absolute/path/to/laravel/storage/logs" 
-                               style="flex: 1;"
-                               value="/Users/mellow/Projects/laravel-logger/test_logs">
-                        <button type="button" onclick="setLogDirectory()" class="search-btn" style="padding: 10px 20px; font-size: 14px;">경로 설정</button>
+            <div class="search-panel-header" onclick="toggleSearchPanel()">
+                <h3>검색 설정</h3>
+                <span class="accordion-icon">▼</span>
+            </div>
+            
+            <div class="search-panel-content" id="search-panel-content">
+                <div class="path-setting" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="log_directory">로그 디렉토리 경로</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="log_directory" name="log_directory" 
+                                   placeholder="/absolute/path/to/laravel/storage/logs" 
+                                   style="flex: 1;"
+                                   value="/Users/mellow/Projects/laravel-logger/test_logs">
+                            <button type="button" onclick="setLogDirectory()" class="search-btn" style="padding: 10px 20px; font-size: 14px;">경로 설정</button>
+                        </div>
+                        <small style="color: #6c757d; margin-top: 5px; display: block;">Laravel 로그 파일들이 저장된 절대 경로를 입력하세요</small>
                     </div>
-                    <small style="color: #6c757d; margin-top: 5px; display: block;">Laravel 로그 파일들이 저장된 절대 경로를 입력하세요</small>
                 </div>
-            </div>
-            
-            <div class="realtime-controls" style="margin-bottom: 15px; padding: 10px; background: #e7f3ff; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input type="checkbox" id="realtime-toggle" style="margin-right: 5px;">
-                        <span>실시간 갱신</span>
-                    </label>
-                    <span id="realtime-status" style="font-size: 12px; color: #6c757d;">비활성화</span>
+                
+                <div class="realtime-controls" style="margin-bottom: 15px; padding: 10px; background: #e7f3ff; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="realtime-toggle" style="margin-right: 5px;">
+                            <span>실시간 갱신</span>
+                        </label>
+                        <span id="realtime-status" style="font-size: 12px; color: #6c757d;">비활성화</span>
+                    </div>
+                    <div id="realtime-indicator" style="display: none; align-items: center; gap: 5px;">
+                        <div class="pulse-dot" style="width: 8px; height: 8px; background: #28a745; border-radius: 50%; animation: pulse 2s infinite;"></div>
+                        <span style="font-size: 12px; color: #28a745;">실시간 모니터링 중</span>
+                    </div>
                 </div>
-                <div id="realtime-indicator" style="display: none; align-items: center; gap: 5px;">
-                    <div class="pulse-dot" style="width: 8px; height: 8px; background: #28a745; border-radius: 50%; animation: pulse 2s infinite;"></div>
-                    <span style="font-size: 12px; color: #28a745;">실시간 모니터링 중</span>
-                </div>
-            </div>
 
-            <div class="quick-dates">
-                <button type="button" class="quick-date-btn" onclick="setQuickDate('today')">오늘</button>
-                <button type="button" class="quick-date-btn" onclick="setQuickDate('yesterday')">어제</button>
-                <button type="button" class="quick-date-btn" onclick="setQuickDate('week')">일주일 전</button>
-                <button type="button" class="quick-date-btn" onclick="setQuickDate('month')">한달 전</button>
+                <div class="quick-dates">
+                    <button type="button" class="quick-date-btn" onclick="setQuickDate('today')">오늘</button>
+                    <button type="button" class="quick-date-btn" onclick="setQuickDate('yesterday')">어제</button>
+                    <button type="button" class="quick-date-btn" onclick="setQuickDate('week')">일주일 전</button>
+                    <button type="button" class="quick-date-btn" onclick="setQuickDate('month')">한달 전</button>
+                </div>
+                
+                <form class="search-form" onsubmit="searchLogs(event)">
+                    <div class="form-group">
+                        <label for="search_date">날짜</label>
+                        <input type="date" id="search_date" name="search_date" value="<?= date('Y-m-d') ?>">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="log_level">로그 레벨</label>
+                        <select id="log_level" name="log_level">
+                            <option value="">전체</option>
+                            <option value="emergency">Emergency</option>
+                            <option value="alert">Alert</option>
+                            <option value="critical">Critical</option>
+                            <option value="error">Error</option>
+                            <option value="warning">Warning</option>
+                            <option value="notice">Notice</option>
+                            <option value="info">Info</option>
+                            <option value="debug">Debug</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="keyword">키워드 검색</label>
+                        <input type="text" id="keyword" name="keyword" placeholder="검색할 키워드를 입력하세요">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="search-btn">검색</button>
+                    </div>
+                </form>
             </div>
-            
-            <form class="search-form" onsubmit="searchLogs(event)">
-                <div class="form-group">
-                    <label for="search_date">날짜</label>
-                    <input type="date" id="search_date" name="search_date" value="<?= date('Y-m-d') ?>">
-                </div>
-                
-                <div class="form-group">
-                    <label for="log_level">로그 레벨</label>
-                    <select id="log_level" name="log_level">
-                        <option value="">전체</option>
-                        <option value="emergency">Emergency</option>
-                        <option value="alert">Alert</option>
-                        <option value="critical">Critical</option>
-                        <option value="error">Error</option>
-                        <option value="warning">Warning</option>
-                        <option value="notice">Notice</option>
-                        <option value="info">Info</option>
-                        <option value="debug">Debug</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="keyword">키워드 검색</label>
-                    <input type="text" id="keyword" name="keyword" placeholder="검색할 키워드를 입력하세요">
-                </div>
-                
-                <div class="form-group">
-                    <label>&nbsp;</label>
-                    <button type="submit" class="search-btn">검색</button>
-                </div>
-            </form>
         </div>
 
         <div class="results-panel">
@@ -1053,9 +1104,46 @@
             }, 3000);
         }
 
+        // 검색 패널 토글 함수
+        function toggleSearchPanel() {
+            const content = document.getElementById('search-panel-content');
+            const icon = document.querySelector('.accordion-icon');
+            
+            const isCollapsed = content.classList.contains('collapsed');
+            
+            if (isCollapsed) {
+                // 펼치기
+                content.classList.remove('collapsed');
+                icon.classList.remove('collapsed');
+                icon.textContent = '▼';
+                localStorage.setItem('search_panel_collapsed', 'false');
+            } else {
+                // 접기
+                content.classList.add('collapsed');
+                icon.classList.add('collapsed');
+                icon.textContent = '▶';
+                localStorage.setItem('search_panel_collapsed', 'true');
+            }
+        }
+        
+        // 패널 상태 복원
+        function restoreSearchPanelState() {
+            const isCollapsed = localStorage.getItem('search_panel_collapsed') === 'true';
+            
+            if (isCollapsed) {
+                const content = document.getElementById('search-panel-content');
+                const icon = document.querySelector('.accordion-icon');
+                
+                content.classList.add('collapsed');
+                icon.classList.add('collapsed');
+                icon.textContent = '▶';
+            }
+        }
+
         // 페이지 로드 시 저장된 경로 불러오기
         document.addEventListener('DOMContentLoaded', function() {
             loadSavedPath();
+            restoreSearchPanelState();
             
             // 저장된 경로가 없으면 기본 경로로 자동 설정
             if (!localStorage.getItem('laravel_log_directory')) {

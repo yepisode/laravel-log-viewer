@@ -924,31 +924,23 @@
             
             // 기존 연결이 있으면 종료
             if (eventSource) {
-                console.log('기존 SSE 연결 종료');
                 eventSource.close();
             }
             
             const url = `sse.php?path=${encodeURIComponent(currentLogDirectory)}&date=${currentSearchParams.date}`;
-            console.log('SSE 연결 시작:', url);
-            console.log('현재 lastModifiedTime:', lastModifiedTime);
-            
             eventSource = new EventSource(url);
             
             eventSource.addEventListener('connected', function(e) {
                 const data = JSON.parse(e.data);
-                console.log('SSE 연결 성공:', data.message);
                 updateRealtimeStatus(true);
                 showNotification('실시간 모니터링이 시작되었습니다.', 'success');
             });
             
             eventSource.addEventListener('file_changed', function(e) {
                 const data = JSON.parse(e.data);
-                console.log('파일 변경 감지:', data);
-                console.log('이전 수정시간:', lastModifiedTime, '새 수정시간:', data.modified_time);
                 
                 // 마지막으로 확인한 시간보다 새로운 변경이면 자동 갱신
                 if (data.modified_time > lastModifiedTime) {
-                    console.log('파일이 새로 수정됨 - 자동 갱신 실행');
                     lastModifiedTime = data.modified_time;
                     showNotification(`로그 파일이 업데이트되었습니다. (${data.modified_time_formatted})`, 'info');
                     
@@ -956,31 +948,22 @@
                     setTimeout(() => {
                         performSearch(currentSearchParams);
                     }, 500);
-                } else {
-                    console.log('파일 수정시간이 이전과 같음 - 갱신 스킵');
                 }
             });
             
             eventSource.addEventListener('file_missing', function(e) {
                 const data = JSON.parse(e.data);
-                console.log('파일 없음:', data);
                 showNotification(data.message, 'warning');
             });
             
             eventSource.addEventListener('error', function(e) {
-                console.error('SSE 이벤트 오류:', e);
-                console.log('EventSource readyState:', eventSource.readyState);
-                
                 if (eventSource.readyState === EventSource.CLOSED) {
-                    console.log('SSE 연결이 종료되었습니다.');
                     updateRealtimeStatus(false);
                     
                     // 실시간 갱신이 활성화된 상태면 재연결 시도
                     if (realtimeEnabled) {
-                        console.log('5초 후 재연결 시도...');
                         setTimeout(() => {
                             if (realtimeEnabled) {
-                                console.log('SSE 재연결 시도 실행');
                                 startRealtimeMonitoring();
                             }
                         }, 5000);
@@ -988,14 +971,7 @@
                 }
             });
             
-            eventSource.onopen = function(e) {
-                console.log('SSE 연결 열림:', e);
-            };
-            
             eventSource.onerror = function(e) {
-                console.error('SSE onError:', e);
-                console.log('EventSource readyState:', eventSource.readyState);
-                
                 if (eventSource.readyState === EventSource.CLOSED) {
                     updateRealtimeStatus(false);
                     showNotification('실시간 연결이 끊어졌습니다.', 'warning');

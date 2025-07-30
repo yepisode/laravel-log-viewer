@@ -53,7 +53,6 @@ try {
     if (file_exists($logFilePath)) {
         $lastModifiedTime = filemtime($logFilePath);
         $lastFileSize = filesize($logFilePath);
-        error_log("SSE 시작: 초기 파일 상태 - 수정시간: $lastModifiedTime, 크기: $lastFileSize");
     }
     
     while (true) {
@@ -65,16 +64,12 @@ try {
             
             // 파일이 수정되었는지 확인 (수정시간 또는 파일크기 변경)
             if ($currentModifiedTime > $lastModifiedTime || $currentFileSize != $lastFileSize) {
-                error_log("파일 변경 감지: 이전({$lastModifiedTime}, {$lastFileSize}) -> 현재({$currentModifiedTime}, {$currentFileSize})");
-                
                 sendEvent('file_changed', [
                     'date' => $date,
                     'modified_time' => $currentModifiedTime,
                     'modified_time_formatted' => date('Y-m-d H:i:s', $currentModifiedTime),
                     'file_size' => $currentFileSize,
-                    'file_size_formatted' => formatBytes($currentFileSize),
-                    'previous_modified_time' => $lastModifiedTime,
-                    'previous_file_size' => $lastFileSize
+                    'file_size_formatted' => formatBytes($currentFileSize)
                 ]);
                 
                 $lastModifiedTime = $currentModifiedTime;
@@ -83,7 +78,6 @@ try {
         } else {
             // 파일이 없는 경우
             if ($lastModifiedTime > 0) {
-                error_log("파일 없음 감지: $logFilePath");
                 sendEvent('file_missing', [
                     'date' => $date,
                     'message' => '로그 파일이 삭제되었거나 이동되었습니다.'
@@ -105,7 +99,6 @@ try {
         
         // 연결이 끊어졌는지 확인
         if (connection_aborted()) {
-            error_log("SSE 연결 종료됨");
             break;
         }
     }

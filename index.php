@@ -829,6 +829,16 @@
             }
         }
 
+        // ESC 키로 모달 닫기
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' || event.keyCode === 27) {
+                const modal = document.getElementById('logModal');
+                if (modal.style.display === 'block') {
+                    closeModal();
+                }
+            }
+        });
+
         // 페이지 로드 시 저장된 경로 불러오기
         document.addEventListener('DOMContentLoaded', function() {
             loadSavedPath();

@@ -217,7 +217,6 @@
         
         .log-row:hover .copy-btn-inline {
             opacity: 1;
-            visibility: visible;
         }
 
         .log-level {
@@ -355,15 +354,14 @@
             background: #667eea;
             color: white;
             border: none;
-            padding: 4px 8px;
+            padding: 6px 12px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 12px;
-            opacity: 0;
-            visibility: hidden;
+            opacity: 0.7;
             transition: all 0.2s ease;
-            margin-left: 10px;
             white-space: nowrap;
+            min-width: 60px;
         }
         
         .copy-btn-inline:hover {
@@ -466,12 +464,23 @@
             
             .log-table th,
             .log-table td {
-                padding: 8px 10px;
-                font-size: 14px;
+                padding: 8px 5px;
+                font-size: 12px;
             }
             
             .log-message {
-                max-width: 200px;
+                max-width: 150px;
+            }
+            
+            .copy-btn-inline {
+                padding: 4px 8px;
+                font-size: 10px;
+                min-width: 45px;
+            }
+            
+            .timestamp {
+                font-size: 11px;
+                min-width: 120px;
             }
             
             .modal-content {
@@ -812,6 +821,7 @@
                             <th>시간</th>
                             <th>레벨</th>
                             <th>메시지</th>
+                            <th style="width: 80px;">동작</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -823,9 +833,9 @@
                     <tr class="log-row">
                         <td class="timestamp" onclick="showLogDetail(${globalIndex})">${log.timestamp}</td>
                         <td onclick="showLogDetail(${globalIndex})"><span class="log-level ${log.level}">${log.level}</span></td>
-                        <td class="log-message" onclick="showLogDetail(${globalIndex})">
-                            ${escapeHtml(log.message)}
-                            <button class="copy-btn-inline" onclick="event.stopPropagation(); copyLogInline(${globalIndex}, this)" title="메시지 복사">복사</button>
+                        <td class="log-message" onclick="showLogDetail(${globalIndex})">${escapeHtml(log.message)}</td>
+                        <td style="text-align: center;">
+                            <button class="copy-btn-inline" onclick="copyLogInline(${globalIndex}, this)" title="메시지 복사">복사</button>
                         </td>
                     </tr>
                 `;

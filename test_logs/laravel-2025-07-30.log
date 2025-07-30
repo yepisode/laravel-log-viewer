@@ -7,4 +7,4 @@
 [2025-07-30 09:22:40] local.CRITICAL: Application crashed {"exception":"FatalErrorException: Class 'NonExistentClass' not found"}
 [2025-07-30 09:24:02] local.INFO: User logout {"user_id":123,"session_duration":"8m39s"}
 [2025-07-30 09:25:18] local.WARNING: Deprecated function used {"function":"mysql_query","file":"legacy.php","line":45}
-[2025-07-30 09:26:35] local.ERROR: File upload failed {"filename":"document.pdf","size":"5MB","error":"File too large"}
+[2025-07-30 09:26:35] local.ERROR: File upload failed {"filename":"document.pdf","size":"5MB","error":"File too large"}[2025-07-30 15:02:43] local.INFO: 실시간 갱신 테스트 로그 메시지 1

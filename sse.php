@@ -44,38 +44,52 @@ try {
     $logFileName = "laravel-{$date}.log";
     $logFilePath = $logReader->getLogDirectory() . DIRECTORY_SEPARATOR . $logFileName;
     
-    // 마지막 확인한 파일 수정 시간
+    // 마지막 확인한 파일 수정 시간과 크기
     $lastModifiedTime = 0;
+    $lastFileSize = 0;
     $heartbeatCounter = 0;
+    
+    // 초기 파일 상태 설정 (첫 실행 시 현재 상태를 기준으로 함)
+    if (file_exists($logFilePath)) {
+        $lastModifiedTime = filemtime($logFilePath);
+        $lastFileSize = filesize($logFilePath);
+        error_log("SSE 시작: 초기 파일 상태 - 수정시간: $lastModifiedTime, 크기: $lastFileSize");
+    }
     
     while (true) {
         // 파일이 존재하는지 확인
         if (file_exists($logFilePath)) {
+            clearstatcache(true, $logFilePath); // 파일 상태 캐시 클리어
             $currentModifiedTime = filemtime($logFilePath);
+            $currentFileSize = filesize($logFilePath);
             
-            // 파일이 수정되었는지 확인
-            if ($currentModifiedTime > $lastModifiedTime) {
-                // 파일 크기도 함께 전송
-                $fileSize = filesize($logFilePath);
+            // 파일이 수정되었는지 확인 (수정시간 또는 파일크기 변경)
+            if ($currentModifiedTime > $lastModifiedTime || $currentFileSize != $lastFileSize) {
+                error_log("파일 변경 감지: 이전({$lastModifiedTime}, {$lastFileSize}) -> 현재({$currentModifiedTime}, {$currentFileSize})");
                 
                 sendEvent('file_changed', [
                     'date' => $date,
                     'modified_time' => $currentModifiedTime,
                     'modified_time_formatted' => date('Y-m-d H:i:s', $currentModifiedTime),
-                    'file_size' => $fileSize,
-                    'file_size_formatted' => formatBytes($fileSize)
+                    'file_size' => $currentFileSize,
+                    'file_size_formatted' => formatBytes($currentFileSize),
+                    'previous_modified_time' => $lastModifiedTime,
+                    'previous_file_size' => $lastFileSize
                 ]);
                 
                 $lastModifiedTime = $currentModifiedTime;
+                $lastFileSize = $currentFileSize;
             }
         } else {
             // 파일이 없는 경우
             if ($lastModifiedTime > 0) {
+                error_log("파일 없음 감지: $logFilePath");
                 sendEvent('file_missing', [
                     'date' => $date,
                     'message' => '로그 파일이 삭제되었거나 이동되었습니다.'
                 ]);
                 $lastModifiedTime = 0;
+                $lastFileSize = 0;
             }
         }
         
@@ -91,6 +105,7 @@ try {
         
         // 연결이 끊어졌는지 확인
         if (connection_aborted()) {
+            error_log("SSE 연결 종료됨");
             break;
         }
     }

@@ -183,7 +183,7 @@
         .log-level.critical { background: #f5c6cb; color: #721c24; }
 
         .log-message {
-            max-width: 400px;
+            max-width: 800px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -276,6 +276,39 @@
 
         .close:hover {
             color: #000;
+        }
+
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .copy-success {
+            color: #28a745;
+            font-size: 14px;
+            margin-left: 10px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .copy-success.show {
+            opacity: 1;
         }
 
         .log-detail {
@@ -719,7 +752,9 @@
                     <dd class="log-detail">${escapeHtml(log.raw_line)}</dd>
                 </dl>
                 <h4>메시지 내용:</h4>
-                <div class="log-detail">${escapeHtml(log.message)}</div>
+                <div class="log-detail" id="log-message-content">${escapeHtml(log.message)}</div>
+                <button class="copy-btn" onclick="copyLogMessage()">메시지 복사</button>
+                <span class="copy-success" id="copy-success">복사되었습니다!</span>
             `;
 
             modalBody.innerHTML = modalContent;
@@ -728,6 +763,56 @@
 
         function closeModal() {
             document.getElementById('logModal').style.display = 'none';
+        }
+
+        function copyLogMessage() {
+            const messageContent = document.getElementById('log-message-content');
+            const successMsg = document.getElementById('copy-success');
+            
+            if (messageContent) {
+                const textToCopy = messageContent.textContent;
+                
+                // 클립보드에 복사
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(textToCopy).then(function() {
+                        // 성공 메시지 표시
+                        successMsg.classList.add('show');
+                        setTimeout(function() {
+                            successMsg.classList.remove('show');
+                        }, 2000);
+                    }).catch(function(err) {
+                        // 폴백: execCommand 사용
+                        fallbackCopyTextToClipboard(textToCopy, successMsg);
+                    });
+                } else {
+                    // 폴백: execCommand 사용
+                    fallbackCopyTextToClipboard(textToCopy, successMsg);
+                }
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text, successMsg) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    successMsg.classList.add('show');
+                    setTimeout(function() {
+                        successMsg.classList.remove('show');
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error('복사 실패:', err);
+            }
+
+            document.body.removeChild(textArea);
         }
 
         function escapeHtml(text) {

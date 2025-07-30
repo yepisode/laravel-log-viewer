@@ -19,6 +19,19 @@ function sanitizeInput($input) {
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
+// 파일 크기 포맷 함수
+function formatBytes($bytes, $precision = 2) {
+    $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    
+    $bytes = max($bytes, 0);
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = min($pow, count($units) - 1);
+    
+    $bytes /= pow(1024, $pow);
+    
+    return round($bytes, $precision) . ' ' . $units[$pow];
+}
+
 function validatePath($path) {
     // 빈 경로 체크
     if (empty($path)) {
@@ -89,6 +102,40 @@ try {
                 'count' => count($availableDates)
             ], '경로가 유효합니다.');
             
+        } catch (Exception $e) {
+            sendResponse(false, null, $e->getMessage());
+        }
+    }
+    
+    // 파일 상태 확인 액션
+    if ($action === 'check_file_status') {
+        if (empty($path) || empty($date)) {
+            sendResponse(false, null, '경로와 날짜가 필요합니다.');
+        }
+        
+        try {
+            $logReader = new LaravelLogReader();
+            $logReader->setLogDirectory($path);
+            
+            $logFileName = "laravel-{$date}.log";
+            $logFilePath = $logReader->getLogDirectory() . DIRECTORY_SEPARATOR . $logFileName;
+            
+            if (file_exists($logFilePath)) {
+                $modifiedTime = filemtime($logFilePath);
+                $fileSize = filesize($logFilePath);
+                
+                sendResponse(true, [
+                    'exists' => true,
+                    'modified_time' => $modifiedTime,
+                    'modified_time_formatted' => date('Y-m-d H:i:s', $modifiedTime),
+                    'file_size' => $fileSize,
+                    'file_size_formatted' => formatBytes($fileSize)
+                ], '파일 상태 확인 완료');
+            } else {
+                sendResponse(true, [
+                    'exists' => false
+                ], '파일이 존재하지 않습니다.');
+            }
         } catch (Exception $e) {
             sendResponse(false, null, $e->getMessage());
         }

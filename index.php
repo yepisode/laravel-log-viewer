@@ -343,6 +343,38 @@
             color: #6c757d;
         }
 
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+            }
+            
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+            }
+            
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -389,6 +421,20 @@
                         <button type="button" onclick="setLogDirectory()" class="search-btn" style="padding: 10px 20px; font-size: 14px;">경로 설정</button>
                     </div>
                     <small style="color: #6c757d; margin-top: 5px; display: block;">Laravel 로그 파일들이 저장된 절대 경로를 입력하세요</small>
+                </div>
+            </div>
+            
+            <div class="realtime-controls" style="margin-bottom: 15px; padding: 10px; background: #e7f3ff; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="realtime-toggle" style="margin-right: 5px;">
+                        <span>실시간 갱신</span>
+                    </label>
+                    <span id="realtime-status" style="font-size: 12px; color: #6c757d;">비활성화</span>
+                </div>
+                <div id="realtime-indicator" style="display: none; align-items: center; gap: 5px;">
+                    <div class="pulse-dot" style="width: 8px; height: 8px; background: #28a745; border-radius: 50%; animation: pulse 2s infinite;"></div>
+                    <span style="font-size: 12px; color: #28a745;">실시간 모니터링 중</span>
                 </div>
             </div>
 
@@ -463,6 +509,10 @@
         let currentSearchData = null;
         const logsPerPage = 20;
         let currentLogDirectory = '';
+        let eventSource = null;
+        let realtimeEnabled = false;
+        let lastModifiedTime = 0;
+        let currentSearchParams = null;
 
         // 로컬 스토리지에서 저장된 경로 불러오기
         function loadSavedPath() {
@@ -604,6 +654,9 @@
 
             loading.style.display = 'block';
             resultsContainer.innerHTML = '';
+            
+            // 현재 검색 파라미터 저장 (실시간 갱신용)
+            currentSearchParams = params;
 
             try {
                 const queryString = new URLSearchParams(params).toString();
@@ -615,6 +668,14 @@
                 if (data.success) {
                     displayResults(data.data);
                     updateResultsCount(data.data);
+                    
+                    // 파일 수정 시간 저장
+                    if (data.data && data.data.last_modified) {
+                        lastModifiedTime = data.data.last_modified;
+                    }
+                    
+                    // 파일 상태 확인을 위한 추가 요청
+                    checkFileStatus(params.path, params.date);
                 } else {
                     resultsContainer.innerHTML = `<div class="no-results">오류: ${data.message}</div>`;
                     resultsCount.textContent = '오류가 발생했습니다';
@@ -625,6 +686,20 @@
                 resultsCount.textContent = '오류가 발생했습니다';
             } finally {
                 loading.style.display = 'none';
+            }
+        }
+        
+        // 파일 상태 확인
+        async function checkFileStatus(path, date) {
+            try {
+                const response = await fetch(`api.php?action=check_file_status&path=${encodeURIComponent(path)}&date=${date}`);
+                const data = await response.json();
+                
+                if (data.success && data.data.exists) {
+                    lastModifiedTime = data.data.modified_time;
+                }
+            } catch (error) {
+                console.error('File status check error:', error);
             }
         }
 
@@ -839,6 +914,148 @@
             }
         });
 
+        // 실시간 갱신 시작
+        function startRealtimeMonitoring() {
+            if (!currentLogDirectory || !currentSearchParams || !currentSearchParams.date) {
+                showNotification('먼저 로그를 검색해주세요.', 'error');
+                document.getElementById('realtime-toggle').checked = false;
+                return;
+            }
+            
+            // 기존 연결이 있으면 종료
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            const url = `sse.php?path=${encodeURIComponent(currentLogDirectory)}&date=${currentSearchParams.date}`;
+            eventSource = new EventSource(url);
+            
+            eventSource.addEventListener('connected', function(e) {
+                const data = JSON.parse(e.data);
+                console.log('SSE 연결됨:', data.message);
+                updateRealtimeStatus(true);
+            });
+            
+            eventSource.addEventListener('file_changed', function(e) {
+                const data = JSON.parse(e.data);
+                console.log('파일 변경 감지:', data);
+                
+                // 마지막으로 확인한 시간보다 새로운 변경이면 자동 갱신
+                if (data.modified_time > lastModifiedTime) {
+                    lastModifiedTime = data.modified_time;
+                    showNotification('로그 파일이 업데이트되었습니다. 자동으로 갱신합니다.', 'info');
+                    
+                    // 현재 검색 조건으로 다시 검색
+                    performSearch(currentSearchParams);
+                }
+            });
+            
+            eventSource.addEventListener('file_missing', function(e) {
+                const data = JSON.parse(e.data);
+                showNotification(data.message, 'warning');
+            });
+            
+            eventSource.addEventListener('error', function(e) {
+                if (e.readyState === EventSource.CLOSED) {
+                    console.log('SSE 연결이 종료되었습니다.');
+                    updateRealtimeStatus(false);
+                    
+                    // 실시간 갱신이 활성화된 상태면 재연결 시도
+                    if (realtimeEnabled) {
+                        setTimeout(() => {
+                            if (realtimeEnabled) {
+                                console.log('SSE 재연결 시도...');
+                                startRealtimeMonitoring();
+                            }
+                        }, 5000);
+                    }
+                } else {
+                    console.error('SSE 오류:', e);
+                }
+            });
+            
+            eventSource.onerror = function(e) {
+                console.error('SSE 연결 오류:', e);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    updateRealtimeStatus(false);
+                }
+            };
+        }
+        
+        // 실시간 갱신 중지
+        function stopRealtimeMonitoring() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            updateRealtimeStatus(false);
+        }
+        
+        // 실시간 상태 업데이트
+        function updateRealtimeStatus(connected) {
+            const status = document.getElementById('realtime-status');
+            const indicator = document.getElementById('realtime-indicator');
+            
+            if (connected) {
+                status.textContent = '연결됨';
+                status.style.color = '#28a745';
+                indicator.style.display = 'flex';
+            } else {
+                status.textContent = '비활성화';
+                status.style.color = '#6c757d';
+                indicator.style.display = 'none';
+            }
+        }
+        
+        // 알림 표시
+        function showNotification(message, type = 'info') {
+            const resultsHeader = document.querySelector('.results-header');
+            let notification = document.getElementById('notification');
+            
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'notification';
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    z-index: 9999;
+                    max-width: 350px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    transition: all 0.3s ease;
+                `;
+                document.body.appendChild(notification);
+            }
+            
+            notification.textContent = message;
+            notification.className = 'fade-in';
+            
+            // 타입별 스타일
+            const styles = {
+                info: { background: '#e7f3ff', color: '#0056b3', border: '1px solid #bee5eb' },
+                success: { background: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' },
+                warning: { background: '#fff3cd', color: '#856404', border: '1px solid #ffeaa7' },
+                error: { background: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb' }
+            };
+            
+            Object.assign(notification.style, styles[type] || styles.info);
+            
+            // 3초 후 제거
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.parentNode.removeChild(notification);
+                        }
+                    }, 300);
+                }
+            }, 3000);
+        }
+
         // 페이지 로드 시 저장된 경로 불러오기
         document.addEventListener('DOMContentLoaded', function() {
             loadSavedPath();
@@ -857,6 +1074,24 @@
                     setLogDirectory();
                 }
             });
+            
+            // 실시간 갱신 토글
+            document.getElementById('realtime-toggle').addEventListener('change', function(e) {
+                realtimeEnabled = e.target.checked;
+                
+                if (realtimeEnabled) {
+                    startRealtimeMonitoring();
+                } else {
+                    stopRealtimeMonitoring();
+                }
+            });
+        });
+        
+        // 페이지 종료 시 SSE 연결 정리
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
         });
     </script>
 </body>

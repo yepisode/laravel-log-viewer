@@ -209,7 +209,15 @@
 
         .log-table tr:hover {
             background: #f8f9fa;
-            cursor: pointer;
+        }
+        
+        .log-row {
+            position: relative;
+        }
+        
+        .log-row:hover .copy-btn-inline {
+            opacity: 1;
+            visibility: visible;
         }
 
         .log-level {
@@ -341,6 +349,34 @@
 
         .copy-btn:active {
             transform: translateY(0);
+        }
+        
+        .copy-btn-inline {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            margin-left: 10px;
+            white-space: nowrap;
+        }
+        
+        .copy-btn-inline:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+        
+        .copy-btn-inline:active {
+            transform: translateY(0);
+        }
+        
+        .copy-btn-inline.copied {
+            background: #28a745;
         }
 
         .copy-success {
@@ -784,10 +820,13 @@
             currentLogs.forEach((log, index) => {
                 const globalIndex = startIndex + index;
                 tableHTML += `
-                    <tr onclick="showLogDetail(${globalIndex})">
-                        <td class="timestamp">${log.timestamp}</td>
-                        <td><span class="log-level ${log.level}">${log.level}</span></td>
-                        <td class="log-message">${escapeHtml(log.message)}</td>
+                    <tr class="log-row">
+                        <td class="timestamp" onclick="showLogDetail(${globalIndex})">${log.timestamp}</td>
+                        <td onclick="showLogDetail(${globalIndex})"><span class="log-level ${log.level}">${log.level}</span></td>
+                        <td class="log-message" onclick="showLogDetail(${globalIndex})">
+                            ${escapeHtml(log.message)}
+                            <button class="copy-btn-inline" onclick="event.stopPropagation(); copyLogInline(${globalIndex}, this)" title="메시지 복사">복사</button>
+                        </td>
                     </tr>
                 `;
             });
@@ -939,6 +978,65 @@
             }
 
             document.body.removeChild(textArea);
+        }
+        
+        // 인라인 복사 기능
+        function copyLogInline(logIndex, buttonElement) {
+            if (!currentSearchData || !currentSearchData.data.logs || !currentSearchData.data.logs[logIndex]) {
+                return;
+            }
+            
+            const log = currentSearchData.data.logs[logIndex];
+            const textToCopy = log.message;
+            
+            // 클립보드에 복사
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(textToCopy).then(function() {
+                    showCopySuccess(buttonElement);
+                }).catch(function(err) {
+                    // 폴백: execCommand 사용
+                    fallbackCopyInline(textToCopy, buttonElement);
+                });
+            } else {
+                // 폴백: execCommand 사용
+                fallbackCopyInline(textToCopy, buttonElement);
+            }
+        }
+        
+        // 폴백 복사 함수
+        function fallbackCopyInline(text, buttonElement) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopySuccess(buttonElement);
+                }
+            } catch (err) {
+                console.error('복사 실패:', err);
+            }
+
+            document.body.removeChild(textArea);
+        }
+        
+        // 복사 성공 피드백
+        function showCopySuccess(buttonElement) {
+            const originalText = buttonElement.textContent;
+            const originalClass = buttonElement.className;
+            
+            buttonElement.textContent = '복사됨!';
+            buttonElement.classList.add('copied');
+            
+            setTimeout(function() {
+                buttonElement.textContent = originalText;
+                buttonElement.className = originalClass;
+            }, 1500);
         }
 
         function escapeHtml(text) {

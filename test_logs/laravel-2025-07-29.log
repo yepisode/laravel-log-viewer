@@ -1,0 +1,8 @@
+[2025-07-29 14:30:15] local.INFO: Application started {"version":"8.0.1","environment":"local"}
+[2025-07-29 14:31:20] local.ERROR: Authentication failed {"user":"admin","attempts":3,"ip":"192.168.1.50"}
+[2025-07-29 14:32:45] local.WARNING: Slow query detected {"query":"SELECT * FROM large_table ORDER BY created_at","time":"2.5s"}
+[2025-07-29 14:34:12] local.INFO: Job processed successfully {"job":"SendEmailJob","queue":"default","duration":"1.2s"}
+[2025-07-29 14:35:33] local.DEBUG: Route matched {"route":"api/users/{id}","method":"GET","controller":"UserController@show"}
+[2025-07-29 14:36:58] local.ERROR: Payment processing failed {"transaction_id":"tx_123456","amount":"$99.99","error":"Credit card declined"}
+[2025-07-29 14:38:22] local.INFO: Backup completed {"backup_size":"1.2GB","duration":"15m30s","destination":"s3://backups/"}
+[2025-07-29 14:39:44] local.ALERT: Disk space critically low {"available":"2GB","total":"100GB","usage":"98%"}

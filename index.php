@@ -345,6 +345,20 @@
         </div>
 
         <div class="search-panel">
+            <div class="path-setting" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="log_directory">로그 디렉토리 경로</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="log_directory" name="log_directory" 
+                               placeholder="/absolute/path/to/laravel/storage/logs" 
+                               style="flex: 1;"
+                               value="/Users/mellow/Projects/laravel-logger/test_logs">
+                        <button type="button" onclick="setLogDirectory()" class="search-btn" style="padding: 10px 20px; font-size: 14px;">경로 설정</button>
+                    </div>
+                    <small style="color: #6c757d; margin-top: 5px; display: block;">Laravel 로그 파일들이 저장된 절대 경로를 입력하세요</small>
+                </div>
+            </div>
+
             <div class="quick-dates">
                 <button type="button" class="quick-date-btn" onclick="setQuickDate('today')">오늘</button>
                 <button type="button" class="quick-date-btn" onclick="setQuickDate('yesterday')">어제</button>
@@ -415,6 +429,95 @@
         let totalPages = 1;
         let currentSearchData = null;
         const logsPerPage = 20;
+        let currentLogDirectory = '';
+
+        // 로컬 스토리지에서 저장된 경로 불러오기
+        function loadSavedPath() {
+            const savedPath = localStorage.getItem('laravel_log_directory');
+            if (savedPath) {
+                document.getElementById('log_directory').value = savedPath;
+                currentLogDirectory = savedPath;
+                showPathStatus('저장된 경로가 로드되었습니다: ' + savedPath, 'success');
+            }
+        }
+
+        // 로그 디렉토리 경로 설정
+        async function setLogDirectory() {
+            const pathInput = document.getElementById('log_directory');
+            const path = pathInput.value.trim();
+            
+            if (!path) {
+                showPathStatus('경로를 입력해주세요.', 'error');
+                return;
+            }
+
+            // 경로 유효성 검증을 위해 API 호출
+            try {
+                const response = await fetch(`api.php?action=validate_path&path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentLogDirectory = path;
+                    localStorage.setItem('laravel_log_directory', path);
+                    showPathStatus(`경로가 설정되었습니다: ${path}`, 'success');
+                    
+                    // 사용 가능한 날짜 목록 업데이트
+                    if (data.available_dates && data.available_dates.length > 0) {
+                        updateAvailableDates(data.available_dates);
+                    }
+                } else {
+                    showPathStatus(`경로 오류: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Path validation error:', error);
+                showPathStatus('경로 검증 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        // 경로 상태 메시지 표시
+        function showPathStatus(message, type) {
+            const pathSetting = document.querySelector('.path-setting');
+            let statusDiv = pathSetting.querySelector('.path-status');
+            
+            if (!statusDiv) {
+                statusDiv = document.createElement('div');
+                statusDiv.className = 'path-status';
+                statusDiv.style.marginTop = '10px';
+                statusDiv.style.padding = '8px 12px';
+                statusDiv.style.borderRadius = '4px';
+                statusDiv.style.fontSize = '14px';
+                pathSetting.appendChild(statusDiv);
+            }
+            
+            statusDiv.textContent = message;
+            
+            if (type === 'success') {
+                statusDiv.style.backgroundColor = '#d4edda';
+                statusDiv.style.color = '#155724';
+                statusDiv.style.border = '1px solid #c3e6cb';
+            } else if (type === 'error') {
+                statusDiv.style.backgroundColor = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.border = '1px solid #f5c6cb';
+            }
+            
+            // 3초 후 메시지 제거
+            setTimeout(() => {
+                if (statusDiv.parentNode) {
+                    statusDiv.parentNode.removeChild(statusDiv);
+                }
+            }, 3000);
+        }
+
+        // 사용 가능한 날짜 목록 업데이트
+        function updateAvailableDates(dates) {
+            const resultsCount = document.getElementById('results-count');
+            if (dates.length > 0) {
+                resultsCount.textContent = `사용 가능한 로그 파일: ${dates.length}개 (${dates[0]} ~ ${dates[dates.length-1]})`;
+            } else {
+                resultsCount.textContent = '로그 파일이 없습니다.';
+            }
+        }
 
         function setQuickDate(type) {
             const dateInput = document.getElementById('search_date');
@@ -442,11 +545,18 @@
         async function searchLogs(event) {
             event.preventDefault();
             
+            // 로그 디렉토리가 설정되지 않은 경우 확인
+            if (!currentLogDirectory) {
+                showPathStatus('먼저 로그 디렉토리 경로를 설정해주세요.', 'error');
+                return;
+            }
+            
             const formData = new FormData(event.target);
             const searchParams = {
                 date: formData.get('search_date'),
                 level: formData.get('log_level'),
                 keyword: formData.get('keyword'),
+                path: currentLogDirectory,
                 page: 1
             };
 
@@ -634,9 +744,24 @@
             }
         }
 
-        // 페이지 로드 시 오늘 날짜로 초기 검색
+        // 페이지 로드 시 저장된 경로 불러오기
         document.addEventListener('DOMContentLoaded', function() {
-            // 자동 검색은 하지 않고 사용자가 직접 검색하도록 함
+            loadSavedPath();
+            
+            // 저장된 경로가 없으면 기본 경로로 자동 설정
+            if (!localStorage.getItem('laravel_log_directory')) {
+                const defaultPath = document.getElementById('log_directory').value;
+                if (defaultPath) {
+                    setLogDirectory();
+                }
+            }
+            
+            // Enter 키로 경로 설정 가능하도록
+            document.getElementById('log_directory').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    setLogDirectory();
+                }
+            });
         });
     </script>
 </body>

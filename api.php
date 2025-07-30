@@ -19,14 +19,86 @@ function sanitizeInput($input) {
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
+function validatePath($path) {
+    // 빈 경로 체크
+    if (empty($path)) {
+        return false;
+    }
+    
+    // 절대 경로인지 확인 (Unix/Linux/macOS는 '/'로 시작, Windows는 드라이브 문자로 시작)
+    if (!preg_match('/^(\/|[A-Za-z]:\\\\)/', $path)) {
+        return false;
+    }
+    
+    // 위험한 패턴들 체크 (보안상 중요한 시스템 디렉토리만 차단)
+    $dangerousPatterns = [
+        '../',      // 상위 디렉토리 접근
+        '..\\',     // 상위 디렉토리 접근 (Windows)
+        '/etc/',    // 시스템 설정 디렉토리
+        '/root/',   // 루트 사용자 홈
+        '/boot/',   // 부트 디렉토리
+        '/sys/',    // 시스템 파일시스템
+        '/proc/',   // 프로세스 정보
+    ];
+    
+    foreach ($dangerousPatterns as $pattern) {
+        if (strpos($path, $pattern) !== false) {
+            return false;
+        }
+    }
+    
+    // 실제 경로 존재 여부 확인
+    $realPath = realpath($path);
+    if ($realPath === false || !is_dir($realPath) || !is_readable($realPath)) {
+        return false;
+    }
+    
+    return true;
+}
+
 try {
     // GET 파라미터 받기
+    $action = isset($_GET['action']) ? sanitizeInput($_GET['action']) : 'search';
     $date = isset($_GET['date']) ? sanitizeInput($_GET['date']) : '';
     $level = isset($_GET['level']) ? sanitizeInput($_GET['level']) : '';
     $keyword = isset($_GET['keyword']) ? sanitizeInput($_GET['keyword']) : '';
+    $path = isset($_GET['path']) ? sanitizeInput($_GET['path']) : '';
     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 
-    // 필수 파라미터 검증
+    // 경로 유효성 검증 액션
+    if ($action === 'validate_path') {
+        if (empty($path)) {
+            sendResponse(false, null, '경로를 입력해주세요.');
+        }
+
+        // 경로 보안 검증
+        if (!validatePath($path)) {
+            sendResponse(false, null, '유효하지 않은 경로입니다.');
+        }
+
+        try {
+            $logReader = new LaravelLogReader();
+            $logReader->setLogDirectory($path);
+            
+            // 사용 가능한 날짜 목록 가져오기
+            $availableDates = $logReader->getAvailableDates();
+            
+            sendResponse(true, [
+                'path' => $path,
+                'available_dates' => $availableDates,
+                'count' => count($availableDates)
+            ], '경로가 유효합니다.');
+            
+        } catch (Exception $e) {
+            sendResponse(false, null, $e->getMessage());
+        }
+    }
+
+    // 검색 액션 (기본)
+    if (empty($path)) {
+        sendResponse(false, null, '로그 디렉토리 경로가 설정되지 않았습니다.');
+    }
+
     if (empty($date)) {
         sendResponse(false, null, '날짜를 선택해주세요.');
     }
@@ -36,12 +108,14 @@ try {
         sendResponse(false, null, '올바른 날짜 형식이 아닙니다. (YYYY-MM-DD)');
     }
 
+    // 경로 보안 검증
+    if (!validatePath($path)) {
+        sendResponse(false, null, '유효하지 않은 경로입니다.');
+    }
+
     // LaravelLogReader 인스턴스 생성 및 설정
     $logReader = new LaravelLogReader();
-    
-    // 테스트 로그 디렉토리 설정 (실제 환경에서는 적절한 경로로 변경)
-    $logDirectory = __DIR__ . '/test_logs';
-    $logReader->setLogDirectory($logDirectory);
+    $logReader->setLogDirectory($path);
 
     // 해당 날짜의 로그 파일 존재 여부 확인
     if (!$logReader->hasLogForDate($date)) {
